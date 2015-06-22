@@ -1,0 +1,110 @@
+N=1000 # number of students 
+K=5 # number of skills
+J=30 # number of items 
+replication=25 # number of replicatoin 
+burning=3000 # burning in
+iter=10000 # total number of interation 
+skillpa<-poss(K) # skill pattern
+mispro<-c(0.1,0.2,0.4)
+
+Chi_I<-matrix(NA,nrow=J,ncol=12*replication)
+G_I<-matrix(NA,nrow=J,ncol=12*replication)
+R_I<-matrix(NA,nrow=J,ncol=12*replication)
+
+Chi_II<-matrix(NA,nrow=J,ncol=12*replication)
+G_II<-matrix(NA,nrow=J,ncol=12*replication)
+R_II<-matrix(NA,nrow=J,ncol=12*replication)
+misitem<-matrix(0,nrow=J,ncol=12*replication)
+
+for(r in 1:replication){
+for(i in 1:2){
+  if(i==1){Q.person<-Qpersonsim(N,K,0.1,0.3)}
+  if(i==2){Q.person<-Qpersonsim(N,K,0.6,0.8)}  
+for(j in 1:2){
+  if(j==1){J=30}
+  if(j==2){J=60}  
+  s<-runif(J,0.1,0.3)
+  g<-runif(J,0.05,0.2)
+  Q.item<-complexQ(1,3,8,J,K)
+  misQ<-Q.item
+
+  for(f in 1:3){
+  F<-mispro[f]*J
+  loc<-sort(sample(1:J,F))
+  misitem[loc,((i-1)*6+(j-1)*3+(f-1))*replication+r]<-loc
+  
+prob1<-DINA(s,g,misQ,Q.person,J,N)
+X<-ifelse(matrix(runif(N*J),N,J)<prob1,1,0)
+prob2<-DINO(Q.person,misQ,s,g)
+X2<-ifelse(matrix(runif(N*J),N,J)<prob2,1,0)
+X[,loc]<-X2[,loc]
+
+####
+s0<-c(rep(0,J))
+g0<-c(rep(0,J))
+Q.person0<-matrix(rep(1,N*K),nrow=N,ncol=K)
+G0<-rep(0,N)
+betas0<-rep(0,K)
+alphas0<-rep(1,K)
+
+s_temp<-matrix(NA,nrow=J,ncol=iter,dimnames=list(c(paste("item_",c(1:J),sep="")),c(paste("iter",c(1:iter),sep=""))))
+g_temp<-matrix(NA,nrow=J,ncol=iter,dimnames=list(c(paste("item_",c(1:J),sep="")),c(paste("iter",c(1:iter),sep=""))))
+person_temp<-matrix(NA,nrow=N,ncol=iter*K)
+Q.person.p<-matrix(NA,nrow=N,ncol=K,dimnames=list(c(paste("P_",c(1:N),sep="")),c(paste("Skill_",c(1:K),sep=""))))
+G_temp<- matrix(NA,N,iter,dimnames=list(c(paste("P",c(1:N),sep="")),c(paste("iteraton",c(1:iter)))))
+b_temp<-matrix(NA,K,iter,dimnames=list(c(paste("Item",c(1:K),sep="")),c(paste("iteraton",c(1:iter)))))
+a_temp<-matrix(NA,K,iter,dimnames=list(c(paste("Item",c(1:K),sep="")),c(paste("iteraton",c(1:iter)))))
+         
+a=0
+while(a<iter){
+a=a+1
+print(a)
+s1<-draw.s(s0,g0,X,Q.item,Q.person0,J,N)
+g1<-draw.g(s1,g0,X,Q.item,Q.person0,J,N)
+G1<-draw.G(G0,alphas0,betas0,Q.person0,N,K)
+pl<-draw.pl(G1,alphas0,betas0,Q.person0,N,K)
+alphas1<-pl$alphas
+betas1<-pl$betas
+prob2<-icc.2pl(G1,alphas1,betas1,N,K)
+Q.personp<-ifelse(matrix(runif(N*K),N,K)<prob2,1,0)
+G0<-G1
+alphas0<-alphas1
+betas0<-betas1
+b_temp[,a]<-betas1
+a_temp[,a]<-alphas1
+G_temp[,a]<-G1
+
+Q.person1<-draw.person(s1,g1,X,Q.item,Q.person0,Q.personp,K,J,N)
+s_temp[,a]<-s1
+g_temp[,a]<-g1
+person_temp[,c((K*a-(K-1)):(K*a))]<-Q.person1
+s0<-s1
+g0<-g1
+Q.person0<-Q.person1
+}
+########
+s_tem<-s_temp[,(burning+1):iter]
+g_tem<-g_temp[,(burning+1):iter]
+person_te<-person_temp[,(K*burning+1):(K*iter)]
+
+temp<-MI(X,s_tem,g_tem,person_te,Q.item,subsample=50,rep=1000)
+
+Chi_I[,((i-1)*6+(j-1)*3+(f-1))*replication+r]<-temp$Chi_square
+G_I[,((i-1)*6+(j-1)*3+(f-1))*replication+r]<-temp$G_square
+R_I[,((i-1)*6+(j-1)*3+(f-1))*replication+r]<-temp$R_square
+
+write.csv(Chi_I,"C:/Users/zshu/Desktop/model fit/output/model_I_chi_30.csv")
+write.csv(G_I,"C:/Users/zshu/Desktop/model fit/output/model_I_g_30.csv")
+write.csv(R_I,"C:/Users/zshu/Desktop/model fit/output/model_I_r_30.csv")
+
+
+temp<-MII(X,s_tem,g_tem,person_te,Q.item,subsample=50,rep=1000)
+Chi_II[,((i-1)*6+(j-1)*3+(f-1))*replication+r]<-temp$Chi_square
+G_II[,((i-1)*6+(j-1)*3+(f-1))*replication+r]<-temp$G_square
+R_II[,((i-1)*6+(j-1)*3+(f-1))*replication+r]<-temp$R_square
+
+write.csv(Chi_II,"C:/Users/zshu/Desktop/model fit/output/model_II_chi_30.csv")
+write.csv(G_II,"C:/Users/zshu/Desktop/model fit/output/model_II_g_30.csv")
+write.csv(R_II,"C:/Users/zshu/Desktop/model fit/output/model_II_r_30.csv")
+write.csv(misitem,"C:/Users/zshu/Desktop/model fit/output/model_misitem_30.csv")
+}}}}
